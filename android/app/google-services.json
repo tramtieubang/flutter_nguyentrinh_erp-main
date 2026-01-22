@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "844612985328",
+    "project_id": "fir-631a8",
+    "storage_bucket": "fir-631a8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:844612985328:android:e5a9f207e0d8316f6a3d35",
+        "android_client_info": {
+          "package_name": "com.example.nguyentrinh_erp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYe5G4GU9H7QAeAhWesctRBzPrjPBl_KE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

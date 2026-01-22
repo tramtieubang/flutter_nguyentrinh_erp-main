@@ -1,0 +1,53 @@
+name: nguyentrinh_erp
+description: "NotifyApp"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+# ================= DEPENDENCIES =================
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_localizations:
+    sdk: flutter
+
+  animations: ^2.0.0
+  image_picker: ^1.0.7
+  logger: ^2.3.0
+  http: ^1.2.0
+  shared_preferences: ^2.2.2
+  dio: ^5.4.0
+  intl: ^0.20.2
+  cupertino_icons: ^1.0.8
+
+  # Firebase (VERSION HỢP LỆ)
+  firebase_core: ^2.30.0
+  firebase_database: ^10.5.0
+  firebase_messaging: ^14.7.10
+
+  provider: ^6.1.5+1
+
+# ================= DEV DEPENDENCIES =================
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+
+# ================= FLUTTER CONFIG =================
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/images/
+
+# ================= LAUNCHER ICON CONFIG =================
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
