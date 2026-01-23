@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'feature_item.dart';
-import 'notification_icon_badge.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../config/routes.dart';
 
 class FeatureGrid extends StatelessWidget {
-  /// Callback đổi tab từ MainScreen
-  final void Function(int index)? onChangeTab;
+  /// Callback đổi tab từ Home → MainScreen
+  final void Function({
+    int? statusId,
+    required int tabBottomIndex,
+    int tabTopIndex,
+  })? onChangeTab;
 
   const FeatureGrid({
     super.key,
@@ -25,46 +27,39 @@ class FeatureGrid extends StatelessWidget {
         childAspectRatio: 1.1,
       ),
       children: [
+        /// ===== CÔNG VIỆC =====
         FeatureItem(
-          icon: Icons.work_outline,
+          icon: Icons.work_rounded,
           label: 'Công việc',
-          iconColor: Colors.green,
+          iconColor: const Color(0xFF43A047),
           onTap: () {
-            onChangeTab?.call(2); // tab Công việc
+            onChangeTab?.call(
+              tabBottomIndex: 2, // tab Công việc
+              tabTopIndex: 1,    // tab "Đã duyệt" (ví dụ)
+            );
           },
         ),
+
+        /// ===== ĐĂNG KÝ =====
         FeatureItem(
-          icon: Icons.app_registration,
+          icon: Icons.app_registration_rounded,
           label: 'Đăng ký',
-          iconColor: Colors.orange,
+          iconColor: const Color(0xFFFFA726),
           onTap: () {
             Navigator.pushNamed(context, Routes.workRegister);
           },
         ),
+
         FeatureItem(
-          icon: Icons.bar_chart_outlined,
+          icon: Icons.assignment_rounded,
           label: 'Báo cáo',
-          iconColor: Colors.blue,
+          iconColor: const Color(0xFF26A69A),
         ),
 
-        /// 🔔 THÔNG BÁO – CLICK → CHUYỂN TAB THÔNG BÁO
-        FutureBuilder<int>(
-          future: NotificationService.countUnread(),
-          builder: (context, snapshot) {
-            final count = snapshot.data ?? 0;
-
-            return FeatureItem(
-              customIcon: NotificationIconBadge(
-                count: count,
-                color: Colors.red,
-              ),
-              label: 'Thông báo',
-              iconColor: Colors.red,
-              onTap: () {
-                onChangeTab?.call(1); // 👈 tab Thông báo
-              },
-            );
-          },
+        FeatureItem(
+          icon: Icons.query_stats_rounded,
+          label: 'Thống kê',
+          iconColor: const Color(0xFF42A5F5),
         ),
       ],
     );

@@ -3,6 +3,8 @@ import 'register_submit_button.dart';
 import 'register_date_picker.dart';
 import '../../../../core/services/work_registered_service.dart';
 
+import '../../../../core/events/work_event.dart';
+
 class RegisterForm extends StatefulWidget {
   const RegisterForm({super.key});
 
@@ -46,6 +48,9 @@ class _RegisterFormState extends State<RegisterForm> {
     setState(() => _loading = false);
 
     if (result) {
+       // 🔥 BÁO CHO TAB CÔNG VIỆC RELOAD
+      WorkEvent.notifyReload();
+
       _showSuccess('Đăng ký công việc thành công');
       Navigator.pop(context, true);
     } else {

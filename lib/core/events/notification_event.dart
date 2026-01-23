@@ -1,27 +1,34 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-/// =======================================================
-/// 🔔 NotificationEvent
-/// - Dùng để phát sự kiện khi:
-///   + Có thông báo mới (FCM)
-///   + Đọc 1 thông báo
-///   + Đọc tất cả thông báo
-///
-/// - Các màn hình chỉ cần lắng nghe:
-///   NotificationEvent.refresh.addListener(...)
-/// =======================================================
 class NotificationEvent {
-  NotificationEvent._(); // ❌ không cho new
+  NotificationEvent._();
 
-  /// ValueNotifier dùng làm "event bus"
-  /// Chỉ cần thay đổi value là tất cả listener được gọi
-  static final ValueNotifier<int> refresh = ValueNotifier<int>(0);
+  /// 🔔 Badge unread
+  static final StreamController<int> _unreadController =
+      StreamController<int>.broadcast();
 
-  /// ===================================================
-  /// 🔥 Phát sự kiện thông báo
-  /// ===================================================
+  /// 🔄 Reload notification list
+  static final StreamController<void> _reloadController =
+      StreamController<void>.broadcast();
+
+  /// ===== STREAM =====
+  static Stream<int> get unreadStream => _unreadController.stream;
+  static Stream<void> get reloadStream => _reloadController.stream;
+
+  /// ===== EMIT =====
+
+  /// Cập nhật số thông báo chưa đọc
+  static void updateUnread(int count) {
+    _unreadController.add(count);
+  }
+
+  /// Trigger reload danh sách
   static void notify() {
-    // Tăng value để trigger listener
-    refresh.value++;
+    _reloadController.add(null);
+  }
+
+  static void dispose() {
+    _unreadController.close();
+    _reloadController.close();
   }
 }

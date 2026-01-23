@@ -3,46 +3,91 @@ import 'package:flutter/material.dart';
 import 'registered/work_registered_screen.dart';
 import 'assignment/work_assignment_screen.dart';
 
+/// =======================================================
+/// MÀN HÌNH CÔNG VIỆC
+/// - Có 2 TAB trên đầu
+/// - Nhận TAB mặc định từ bên ngoài (BottomNavigation)
+/// - Có thể truyền status sang tab "Đã duyệt"
+/// =======================================================
 class WorkScreen extends StatefulWidget {
-  final int? status;
+  final int? status;       // 👈 status công việc (truyền sang tab Đã duyệt)
+  final int initialTab;    // 👈 tab trên đầu cần mở (0 hoặc 1)
 
-  const WorkScreen({super.key, this.status});
+  const WorkScreen({
+    super.key,
+    this.status,
+    this.initialTab = 0,
+  });
 
   @override
   State<WorkScreen> createState() => _WorkScreenState();
 }
 
 class _WorkScreenState extends State<WorkScreen>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
-  late TabController _tabController;
+    with SingleTickerProviderStateMixin,
+         AutomaticKeepAliveClientMixin {
 
+  late TabController _tabController;
+  int? _currentStatus; // 👈 lưu status hiện tại
+
+  /// =======================================================
+  /// GIỮ STATE KHI CHUYỂN TAB / BOTTOM TAB
+  /// =======================================================
   @override
   bool get wantKeepAlive => true;
 
+  /// =======================================================
+  /// KHỞI TẠO TAB CONTROLLER
+  /// =======================================================
   @override
-  /* void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  } */
-
   void initState() {
     super.initState();
+
+    _currentStatus = widget.status;
+
     _tabController = TabController(
       length: 2,
       vsync: this,
-      initialIndex: 1, // 🔥 MẶC ĐỊNH TAB "CÔNG VIỆC PHÂN CÔNG"
+      initialIndex: widget.initialTab, // 👈 LẤY TAB TỪ BÊN NGOÀI
     );
   }
 
+  /// =======================================================
+  /// LẮNG NGHE KHI initialTab / status THAY ĐỔI
+  /// (BẮT BUỘC PHẢI CÓ)
+  /// =======================================================
+  @override
+  void didUpdateWidget(covariant WorkScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 👉 Khi tab trên đầu thay đổi từ bên ngoài
+    if (oldWidget.initialTab != widget.initialTab) {
+      _tabController.animateTo(widget.initialTab);
+    }
+
+    // 👉 Khi status thay đổi
+    if (oldWidget.status != widget.status) {
+      setState(() {
+        _currentStatus = widget.status;
+      });
+    }
+  }
+
+  /// =======================================================
+  /// GIẢI PHÓNG CONTROLLER
+  /// =======================================================
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
 
+  /// =======================================================
+  /// UI CHÍNH
+  /// =======================================================
   @override
   Widget build(BuildContext context) {
-    super.build(context);
+    super.build(context); // 👈 BẮT BUỘC cho KeepAlive
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -60,7 +105,7 @@ class _WorkScreenState extends State<WorkScreen>
         child: SafeArea(
           child: Column(
             children: [
-              /// ===== TAB BAR =====
+              /// ================= TAB BAR (TRÊN ĐẦU) =================
               Container(
                 margin: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -80,22 +125,22 @@ class _WorkScreenState extends State<WorkScreen>
                   ),
                   tabs: const [
                     Tab(text: 'Đã đăng ký'),
-                    Tab(text: 'Đã duệt'),
+                    Tab(text: 'Đã duyệt'),
                   ],
                 ),
               ),
 
-              /// ===== TAB VIEW =====
+              /// ================= TAB VIEW =================
               Expanded(
                 child: TabBarView(
                   controller: _tabController,
                   children: [
-                    /// TAB 1
-                    WorkRegisteredScreen(),
+                    /// ---------- TAB 1: ĐÃ ĐĂNG KÝ ----------
+                    const WorkRegisteredScreen(),
 
-                    /// TAB 2
+                    /// ---------- TAB 2: ĐÃ DUYỆT ----------
                     WorkAssignmentScreen(
-                      status: widget.status,
+                      status: _currentStatus, // 👈 status đã xử lý
                     ),
                   ],
                 ),

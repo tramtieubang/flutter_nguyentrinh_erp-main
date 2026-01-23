@@ -11,13 +11,19 @@ import 'widgets/feature_grid.dart';
 
 /// =======================================================
 /// 🏠 HOME SCREEN
-/// - Giữ state khi đổi tab
-/// - Load thống kê công việc
-/// - KHÔNG xử lý badge thông báo
+/// - Giữ state khi đổi tab (IndexedStack)
+/// - Load thống kê công việc SAU KHI đã có user
+/// - KHÔNG bị treo khi mở app từ notification
+/// - KHÔNG gọi API trong build()
 /// =======================================================
 class HomeScreen extends StatefulWidget {
-  /// callback đổi tab từ Home → MainScreen
-  final void Function(int index, {int? statusId})? onChangeTab;
+  /// 🔁 Callback đổi tab từ Home → MainScreen
+  /// Dùng named parameters cho rõ ràng
+  final void Function({
+    int? statusId,
+    required int tabBottomIndex,
+    int tabTopIndex,
+  })? onChangeTab;
 
   const HomeScreen({
     super.key,
@@ -33,26 +39,31 @@ class _HomeScreenState extends State<HomeScreen>
   /// ===============================
   /// STATE
   /// ===============================
-  bool _loadingStatistic = true;
+
+  /// 🔄 Loading thống kê
+  bool _loadingStatistic = false;
+
+  /// 📊 Danh sách trạng thái công việc
   List<WorkStatus> _statuses = [];
 
-  /// Giữ state khi đổi tab BottomNavigationBar
+  /// 🔒 Đảm bảo chỉ load 1 lần sau khi có user
+  bool _loadedOnce = false;
+
+  /// ===============================
+  /// GIỮ STATE KHI ĐỔI TAB
+  /// ===============================
   @override
   bool get wantKeepAlive => true;
 
   /// ===============================
-  /// INIT
-  /// ===============================
-  @override
-  void initState() {
-    super.initState();
-    _loadStatistic();
-  }
-
-  /// ===============================
-  /// LOAD: thống kê công việc
+  /// LOAD THỐNG KÊ CÔNG VIỆC
+  /// - Chỉ gọi khi đã có user
   /// ===============================
   Future<void> _loadStatistic() async {
+    if (_loadingStatistic) return;
+
+    setState(() => _loadingStatistic = true);
+
     try {
       final data = await WorkAssignmentService.getStatusCounts();
       if (!mounted) return;
@@ -61,7 +72,8 @@ class _HomeScreenState extends State<HomeScreen>
         _statuses = data;
         _loadingStatistic = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('❌ Load statistic error: $e');
       if (!mounted) return;
 
       setState(() {
@@ -72,11 +84,11 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   /// ===============================
-  /// BUILD
+  /// BUILD UI
   /// ===============================
   @override
   Widget build(BuildContext context) {
-    super.build(context); // ⚠️ bắt buộc khi dùng KeepAlive
+    super.build(context); // ⚠️ bắt buộc với KeepAlive
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -95,10 +107,21 @@ class _HomeScreenState extends State<HomeScreen>
           child: ValueListenableBuilder<UserModel?>(
             valueListenable: UserSession.currentUser,
             builder: (context, user, _) {
+              /// ⛔ CHƯA CÓ USER → HIỂN THỊ LOADING
               if (user == null) {
                 return const Center(
                   child: CircularProgressIndicator(color: Colors.orange),
                 );
+              }
+
+              /// 🔥 SAU KHI CÓ USER → LOAD THỐNG KÊ 1 LẦN
+              if (!_loadedOnce) {
+                _loadedOnce = true;
+
+                /// ⚠️ Đẩy sang frame sau để tránh setState trong build
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) _loadStatistic();
+                });
               }
 
               /// ================= USER INFO =================
@@ -126,17 +149,26 @@ class _HomeScreenState extends State<HomeScreen>
 
                     /// ================= STATISTIC =================
                     _loadingStatistic
-                        ? const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.orange,
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.orange,
+                              ),
                             ),
                           )
                         : StatisticCard(
                             statuses: _statuses,
-                            onTapStatus: (statusId) {
+                            onTapStatus: ({
+                              int? statusId,
+                              required int tabBottomIndex,
+                              required int tabTopIndex,
+                            }) {
+                              /// 👉 Chuyển tab + filter công việc
                               widget.onChangeTab?.call(
-                                2,
                                 statusId: statusId,
+                                tabBottomIndex: tabBottomIndex,
+                                tabTopIndex: tabTopIndex,
                               );
                             },
                           ),
@@ -155,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                     const SizedBox(height: 16),
 
+                    /// ================= GRID =================
                     FeatureGrid(
                       onChangeTab: widget.onChangeTab,
                     ),

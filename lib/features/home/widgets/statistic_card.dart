@@ -4,7 +4,13 @@ import '../../../core/utils/color_helper.dart';
 
 class StatisticCard extends StatelessWidget {
   final List<WorkStatus> statuses;
-  final Function(int?) onTapStatus;
+
+  /// ✅ callback chuẩn – named parameters
+  final void Function({
+    int? statusId,
+    required int tabBottomIndex,
+    required int tabTopIndex,
+  }) onTapStatus;
 
   const StatisticCard({
     super.key,
@@ -25,18 +31,22 @@ class StatisticCard extends StatelessWidget {
         itemBuilder: (context, index) {
           final status = statuses[index];
 
-          /// 🎨 MÀU STATUS TỪ DB (#rrggbb)
           final Color statusColor =
               ColorHelper.hexToColor(status.color);
 
-          /// 🔹 ICON THEO STATUS
           final IconData iconData =
               _getIconByStatusName(status.name);
 
           return InkWell(
             borderRadius: BorderRadius.circular(14),
             splashColor: Colors.white24,
-            onTap: () => onTapStatus(status.id),
+
+            /// ✅ GỌI CALLBACK ĐÚNG KIỂU
+            onTap: () => onTapStatus(
+              statusId: status.id,
+              tabBottomIndex: 2, // 👉 Công việc
+              tabTopIndex: 1,    // 👉 Tab trạng thái
+            ),
 
             child: Container(
               width: cardWidth,
@@ -44,17 +54,12 @@ class StatisticCard extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
-
-                /// 🌈 GRADIENT THEO STATUS
                 gradient: LinearGradient(
                   colors: [
                     statusColor.withAlpha((0.95 * 255).round()),
                     statusColor.withAlpha((0.75 * 255).round()),
                   ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                 ),
-
                 boxShadow: [
                   BoxShadow(
                     color: statusColor.withAlpha((0.35 * 255).round()),
@@ -63,11 +68,9 @@ class StatisticCard extends StatelessWidget {
                   ),
                 ],
               ),
-
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  /// 🔥 ICON – MÀU THEO STATUS
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
@@ -75,20 +78,15 @@ class StatisticCard extends StatelessWidget {
                       color: Colors.white.withAlpha((0.25 * 255).round()),
                       border: Border.all(
                         color: Colors.white.withAlpha((0.6 * 255).round()),
-                        width: 1,
                       ),
                     ),
                     child: Icon(
                       iconData,
-                      //color: statusColor, // ✅ ICON ĐỔI MÀU THEO STATUS
-                      color: Colors.white, // ✅ icon màu trắng
+                      color: Colors.white,
                       size: 24,
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
-                  /// 🔢 SỐ LƯỢNG
                   Text(
                     status.count.toString(),
                     style: const TextStyle(
@@ -97,10 +95,7 @@ class StatisticCard extends StatelessWidget {
                       color: Colors.white,
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
-                  /// 🏷 TÊN TRẠNG THÁI
                   Text(
                     status.name,
                     textAlign: TextAlign.center,
@@ -120,7 +115,6 @@ class StatisticCard extends StatelessWidget {
     );
   }
 
-  /// 🔹 MAP ICON THEO TRẠNG THÁI
   IconData _getIconByStatusName(String name) {
     switch (name) {
       case 'Hoàn thành':

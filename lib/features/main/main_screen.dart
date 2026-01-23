@@ -5,10 +5,18 @@ import '../notification/notification_screen.dart';
 import '../work/work_screen.dart';
 import '../profile/profile_screen.dart';
 
-import '../../core/events/notification_event.dart'; // 🔥 THÊM
+import '../../core/events/notification_event.dart';
+import '../../core/services/notification_service.dart';
 import 'widgets/main_app_bar.dart';
 import 'widgets/main_bottom_nav.dart';
 
+/// =======================================================
+/// 🧭 MAIN SCREEN
+/// - Quản lý BottomNavigation
+/// - Giữ state bằng IndexedStack
+/// - Nhận callback đổi tab từ Home
+/// - Quản lý badge thông báo
+/// =======================================================
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -17,32 +25,84 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  /// ===============================
+  /// STATE
+  /// ===============================
+
+  /// 👉 Tab đang chọn (BottomNavigation)
   int _currentIndex = 0;
 
-  /// 🔥 status nhận từ Home (badge / statistic)
+  /// 🔔 Số thông báo chưa đọc
+  int _unreadCount = 0;
+
+  /// 🔥 Filter trạng thái cho WorkScreen
   int? _workStatusId;
 
-  /// 👉 Đổi tab (dùng chung cho Home + BottomNav)
-  void _changeTab(int index, {int? statusId}) {
-    setState(() {
-      _currentIndex = index;
+  /// 🔥 Tab TRÊN (TabBar) của WorkScreen
+  int _workInitialTab = 0;
 
-      // ✅ Chỉ giữ status khi vào tab Công việc
-      if (index == 2) {
-        _workStatusId = statusId;
-      } else {
-        _workStatusId = null;
-      }
+  /// ===============================
+  /// INIT
+  /// ===============================
+  @override
+  void initState() {
+    super.initState();
+
+    /// 🔔 Lắng nghe thay đổi badge thông báo toàn app
+    NotificationEvent.unreadStream.listen((count) {
+      if (!mounted) return;
+      setState(() => _unreadCount = count);
     });
 
-    /// 🔔 Nếu vào tab THÔNG BÁO → reload
-    if (index == 1) {
-      NotificationEvent.notify();
+    /// 🔥 Load số thông báo khi app mở
+    _loadUnreadCount();
+  }
+
+  /// ===============================
+  /// LOAD BADGE THÔNG BÁO
+  /// ===============================
+  Future<void> _loadUnreadCount() async {
+    try {
+      final count = await NotificationService.fetchUnreadCount();
+
+      /// 🔔 Update stream toàn app
+      NotificationEvent.updateUnread(count);
+    } catch (e) {
+      debugPrint('❌ Load unread error: $e');
     }
   }
 
-  
+  /// ===============================
+  /// 👉 ĐỔI TAB TỪ HOME / BOTTOM NAV
+  /// ===============================
+  void _changeTab({
+    int? statusId,
+    required int tabBottomIndex,
+    int tabTopIndex = 0,
+  }) {
+    setState(() {
+      /// 👉 Đổi tab dưới
+      _currentIndex = tabBottomIndex;
 
+      /// 👉 Nếu vào tab Công việc
+      if (tabBottomIndex == 2) {
+        _workStatusId = statusId;
+        _workInitialTab = tabTopIndex;
+      } else {
+        _workStatusId = null;
+        _workInitialTab = 0;
+      }
+    });
+
+    /// 🔔 Vào tab Thông báo → reload badge
+    if (tabBottomIndex == 1) {
+      _loadUnreadCount();
+    }
+  }
+
+  /// ===============================
+  /// TITLE THEO TAB
+  /// ===============================
   final List<String> _titles = const [
     'TRANG CHỦ',
     'THÔNG BÁO',
@@ -50,18 +110,19 @@ class _MainScreenState extends State<MainScreen> {
     'CÁ NHÂN',
   ];
 
+  /// ===============================
+  /// BUILD UI
+  /// ===============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // ===== APP BAR =====
+      /// ===== APP BAR =====
       appBar: MainAppBar(
         title: _titles[_currentIndex],
       ),
 
-      // ===== BODY =====
+      /// ===== BODY =====
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -76,24 +137,25 @@ class _MainScreenState extends State<MainScreen> {
           child: IndexedStack(
             index: _currentIndex,
             children: [
-              /// 🏠 HOME
+              /// ===== 🏠 HOME =====
               HomeScreen(
                 key: const PageStorageKey('home'),
                 onChangeTab: _changeTab,
               ),
 
-              /// 🔔 NOTIFICATION
+              /// ===== 🔔 NOTIFICATION =====
               const NotificationScreen(
                 key: PageStorageKey('notification'),
               ),
 
-              /// 🧾 WORK
+              /// ===== 📋 WORK =====
               WorkScreen(
                 key: const PageStorageKey('work'),
                 status: _workStatusId,
+                initialTab: _workInitialTab,
               ),
 
-              /// 👤 PROFILE
+              /// ===== 👤 PROFILE =====
               const ProfileScreen(
                 key: PageStorageKey('profile'),
               ),
@@ -102,10 +164,13 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
 
-      // ===== BOTTOM NAV =====
+      /// ===== BOTTOM NAV =====
       bottomNavigationBar: MainBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => _changeTab(index),
+        unreadCount: _unreadCount,
+        onTap: (index) {
+          _changeTab(tabBottomIndex: index);
+        },
       ),
     );
   }
