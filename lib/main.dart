@@ -2,48 +2,60 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'app.dart'; // Home screen (WorkScreen)
+import 'app.dart';
 import 'core/services/auth_service.dart';
+import 'core/session/user_session.dart';
 import 'core/services/work_assignment_service.dart';
 import 'core/models/work_assignment_model.dart';
 import 'features/work/work_detail_screen.dart';
 import 'features/auth/login_screen.dart';
 
-/// 🔹 Navigator global
+/// 🔹 Navigator global (dùng cho notification)
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// 🔹 Background handler (KHÔNG UI)
+/// =======================================================
+/// 🔹 FCM background handler (KHÔNG UI)
+/// =======================================================
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 }
 
-/// 🔹 Xử lý notification, push chi tiết hoặc yêu cầu login
+/// =======================================================
+/// 🔹 Xử lý khi click notification
+/// - Nếu CHƯA login → mở Login
+/// - Nếu ĐÃ login → mở chi tiết công việc
+/// =======================================================
 void _handleNotification(RemoteMessage message) {
   final navigator = navigatorKey.currentState;
   if (navigator == null) return;
 
-  final Map<String, dynamic> data = message.data;
+  final data = message.data;
   final int? workId = int.tryParse(data['work_id']?.toString() ?? '');
   if (workId == null) return;
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // 🔹 Kiểm tra login
-    final bool loggedIn = await AuthService.isLoggedIn();
-    if (!loggedIn) {
+    /// 🔥 LẤY USER HIỆN TẠI
+    final user = await AuthService.getCurrentUser();
+
+    /// ❌ CHƯA LOGIN → ĐẨY VỀ LOGIN
+    if (user == null) {
       navigator.push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
       return;
     }
 
+    /// ✅ ĐÃ LOGIN → SET SESSION (CỰC KỲ QUAN TRỌNG)
+    UserSession.set(user);
+
     try {
-      // 🔹 Lấy chi tiết công việc từ API
+      /// 🔹 Gọi API lấy chi tiết công việc
       final WorkAssignmentModel work =
           await WorkAssignmentService.getWorkDetail(workId);
 
       if (!navigator.mounted) return;
 
-      // 🔹 Push màn hình chi tiết
+      /// 🔹 Push màn hình chi tiết
       navigator.push(
         MaterialPageRoute(
           builder: (_) => WorkDetailScreen(
@@ -55,34 +67,47 @@ void _handleNotification(RemoteMessage message) {
         ),
       );
     } catch (e, s) {
-      debugPrint('❌ Lấy chi tiết thất bại: $e');
+      debugPrint('❌ Lỗi lấy chi tiết công việc: $e');
       debugPrintStack(stackTrace: s);
     }
   });
 }
 
+/// =======================================================
+/// 🔹 MAIN
+/// =======================================================
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // 🔹 Background FCM
+  /// 🔥 LOAD USER ĐÃ LOGIN (FIX LỖI HOME TRẮNG)
+  final user = await AuthService.getCurrentUser();
+  if (user != null) {
+    UserSession.set(user);
+  }
+
+  /// 🔹 FCM background
   FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
+  /// 🔹 Xin quyền notification
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  // 🔹 App đang mở
+  /// 🔹 App đang mở
   FirebaseMessaging.onMessage.listen(_handleNotification);
 
   runApp(const MyAppWrapper());
 }
 
-/// ===============================
-/// 🔹 Wrapper App
-/// ===============================
+/// =======================================================
+/// 🔹 APP WRAPPER
+/// - Bắt notification khi app:
+///   + bị kill
+///   + chạy background
+/// =======================================================
 class MyAppWrapper extends StatefulWidget {
   const MyAppWrapper({super.key});
 
@@ -91,43 +116,49 @@ class MyAppWrapper extends StatefulWidget {
 }
 
 class _MyAppWrapperState extends State<MyAppWrapper> {
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
+    _initApp();
+  }
 
-    // 🔹 App bị kill → mở bằng notification
-    FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) _handleNotification(message);
-    });
+  Future<void> _initApp() async {
+    /// 🔥 LOAD USER TRƯỚC
+    final user = await AuthService.getCurrentUser();
+    if (user != null) {
+      UserSession.set(user);
+    }
 
-    // 🔹 App background → mở bằng notification
+    /// 🔹 App mở từ notification khi bị kill
+    final message = await FirebaseMessaging.instance.getInitialMessage();
+    if (message != null) {
+      _handleNotification(message);
+    }
+
+    /// 🔹 App background → click notification
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotification);
+
+    setState(() => _loading = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: CircularProgressIndicator(color: Colors.orange),
+          ),
+        ),
+      );
+    }
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'Work App',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const MyApp(), // Your WorkScreen
-      onGenerateRoute: (settings) {
-        if (settings.name == '/workdetailscreen') {
-          final Map<String, String> data =
-              Map<String, String>.from(settings.arguments as Map);
-
-          return MaterialPageRoute(
-            builder: (_) => WorkDetailScreen(
-              title: data['title'] ?? '',
-              startDate: data['start_date'] ?? '',
-              endDate: data['end_date'] ?? '',
-              description: data['description'] ?? '',
-            ),
-          );
-        }
-        return null;
-      },
+      home: const MyApp(),
     );
   }
 }
