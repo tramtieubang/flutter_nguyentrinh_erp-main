@@ -10,7 +10,7 @@ import '../network/api_client.dart';
 import '../storage/local_storage.dart';
 
 import '../services/auth_service.dart';
-import '../models/user_model.dart';
+//import '../models/user_model.dart';
 
 class ProfileService {
   ProfileService._();
@@ -97,10 +97,12 @@ class ProfileService {
       }
 
       /// 🔥🔥🔥 BACKEND PHẢI TRẢ USER MỚI
-      final updatedUser = UserModel.fromJson(jsonData['data']);
+      //final updatedUser = UserModel.fromJson(jsonData['data']);
 
       /// 🔥🔥🔥 CẬP NHẬT SESSION TOÀN APP
-      await AuthService.updateCurrentUser(updatedUser);
+      //await AuthService.updateCurrentUser(updatedUser);
+
+      await AuthService.reloadFromApi();
 
       return true;
     } catch (e) {

@@ -13,6 +13,9 @@ class UserModel {
     this.profile,
   });
 
+  /// ===============================
+  /// FACTORY
+  /// ===============================
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] is int
@@ -26,6 +29,39 @@ class UserModel {
     );
   }
 
+  /// ===============================
+  /// GETTERS TIỆN DÙNG CHO UI
+  /// ===============================
+
+  /// 👤 Tên hiển thị (ưu tiên profile.name)
+  String get displayName {
+    final name = profile?.name;
+    if (name != null && name.isNotEmpty) return name;
+    return username;
+  }
+
+  /// 📞 Dố DT
+  String get displayPhone {
+    final phone = profile?.phone;
+    if (phone != null && phone.isNotEmpty) return phone;
+    return 'Chưa cập nhật';
+  }
+
+  /// 🖼 Avatar (lấy từ staff/profile)
+  String get avatar {
+    return profile?.avatar ?? '';
+  }
+  
+
+  /// 📧 Email ưu tiên profile
+  String? get displayEmail {
+    return profile?.email ?? email;
+  }
+  
+
+  /// ===============================
+  /// TO JSON
+  /// ===============================
   Map<String, dynamic> toJson() {
     return {
       'id': id,

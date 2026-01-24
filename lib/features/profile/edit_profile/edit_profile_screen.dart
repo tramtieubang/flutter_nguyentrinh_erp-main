@@ -6,7 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/models/profile_model.dart';
 import '../../../core/services/profile_service.dart';
 import '../../../config/api_config.dart';
-//import '../../../core/session/user_session.dart';
+import '../../../core/session/user_session.dart';
 import 'widgets/edit_profile_appbar.dart';
 import 'widgets/edit_profile_form_card.dart';
 
@@ -132,36 +132,50 @@ class _UpdateProfileScreenState extends State<UpdateProfileScreen> {
   /// ============================
   /// 🚀 SUBMIT
   /// ============================
- Future<void> _submit() async {
-  if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    // 1️⃣ Validate form
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() => _loading = true);
+    // 2️⃣ Bật loading
+    setState(() => _loading = true);
 
-  final success = await ProfileService.updateProfile(
-    name: _nameCtrl.text.trim(),
-    email: _emailCtrl.text.trim(),
-    phone: _phoneCtrl.text.trim(),
-    avatar: _avatarFile,
-  );
+    // 3️⃣ Gọi API update profile
+    final success = await ProfileService.updateProfile(
+      name: _nameCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      avatar: _avatarFile,
+    );
 
-  if (!mounted) return; // 🔥 BẮT BUỘC
+    // ⛔ Widget đã dispose thì dừng luôn
+    if (!mounted) return;
 
-  setState(() => _loading = false);
+    // 4️⃣ Tắt loading
+    setState(() => _loading = false);
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        success ? 'Cập nhật thông tin thành công' : 'Cập nhật thất bại',
+    // 5️⃣ Hiển thị thông báo
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Cập nhật thông tin thành công'
+              : 'Cập nhật thông tin thất bại',
+        ),
+        backgroundColor: success ? Colors.green : Colors.red,
       ),
-      backgroundColor: success ? Colors.green : Colors.red,
-    ),
-  );
+    );
 
-  if (success) {
-    Navigator.pop(context, true);
+    // 6️⃣ Nếu thành công → reload user + quay lại Home
+    if (success) {
+      /// 🔥🔥🔥 QUAN TRỌNG: reload user từ server
+      await UserSession.reload();
+
+      // ⚠️ reload cũng là async → check mounted lần nữa
+      if (!mounted) return;
+
+      Navigator.pop(context, true);
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {

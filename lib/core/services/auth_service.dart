@@ -210,4 +210,28 @@ class AuthService {
     }
   }
 
+  static Future<bool> reloadFromApi() async {
+    try {
+      final response = await ApiClient.get('/auth/me');
+
+      if (response.statusCode != 200) return false;
+
+      final jsonData = jsonDecode(response.body);
+      if (jsonData['success'] != true) return false;
+
+      final user = UserModel.fromJson(jsonData['data']);
+
+      /// 🔥 CẬP NHẬT TOÀN BỘ APP
+      currentUser.value = user;
+      await LocalStorage.saveUser(user);
+
+      debugPrint('✅ Reload from API: ${user.toJson()}');
+      return true;
+    } catch (e) {
+      debugPrint('❌ reloadFromApi error: $e');
+      return false;
+    }
+  }
+
+
 }
