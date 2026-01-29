@@ -4,125 +4,141 @@ import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../network/api_client.dart';
 import '../storage/local_storage.dart';
+import '../session/user_session.dart';
 
+/// =====================================================
+/// 🔐 AUTH SERVICE – FINAL VERSION
+/// - Không refresh token
+/// - Token hết hạn → bắt login lại
+/// - Hỗ trợ login vân tay chuẩn
+/// =====================================================
 class AuthService {
-  /// =====================================================
-  /// 🔥 USER TOÀN CỤC
-  /// - Toàn bộ app (HomeHeader, Profile, Drawer...)
-  /// - Chỉ nghe 1 nguồn duy nhất
-  /// =====================================================
+  AuthService._();
+
+  /// 👤 USER TOÀN APP
   static final ValueNotifier<UserModel?> currentUser =
       ValueNotifier<UserModel?>(null);
 
-  /// =====================================================
-  /// 🔐 VERIFY TOKEN (DÙNG CHO SPLASH)
-  /// - Kiểm tra token còn hợp lệ không
-  /// - Nếu hợp lệ → set currentUser
-  /// =====================================================
-  static Future<bool> verifyToken() async {
-    try {
-      final token = await LocalStorage.getToken();
-      if (token == null || token.isEmpty) return false;
-
-      final response = await ApiClient.get(
-        '/auth/me',
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode != 200) return false;
-
-      final jsonData = jsonDecode(response.body);
-      if (jsonData['success'] != true) return false;
-
-      /// 🔥 parse user
-      final user = UserModel.fromJson(jsonData['data']);
-
-      /// 🔥 lưu + bắn notifier
-      currentUser.value = user;
-      await LocalStorage.saveUser(user);
-
-      return true;
-    } catch (e) {
-      debugPrint('verifyToken error: $e');
-      return false;
-    }
+  // =====================================================
+  // 🚀 INIT APP (gọi trong main())
+  // =====================================================
+  static Future<void> init() async {
+    final user = await LocalStorage.getUser();
+    currentUser.value = user;
   }
 
-  /// =====================================================
-  /// 🔑 LOGIN
-  /// - Lưu token
-  /// - Lưu user
-  /// - Set currentUser
-  /// =====================================================
-  static Future<UserModel?> login(String username, String password) async {
+  // =====================================================
+  // 🔐 LOGIN USERNAME / PASSWORD
+  // =====================================================
+  static Future<UserModel?> login(
+    String username,
+    String password,
+  ) async {
     try {
       final response = await ApiClient.post(
         '/auth/login',
         body: {
-          'username': username,
+          'username': username.trim(),
           'password': password,
         },
       );
 
       if (response.statusCode != 200) return null;
 
-      final jsonData = jsonDecode(response.body);
-      if (jsonData['success'] != true) return null;
+      final json = jsonDecode(response.body);
+      if (json['success'] != true) return null;
 
-      final data = jsonData['data'];
+      final data = json['data'];
 
-      /// 🔐 TOKEN
-      final token = data['token'];
-      if (token == null || token.toString().isEmpty) return null;
+      /// TOKEN
+      final String token = data['token'] ?? '';
+      if (token.isEmpty) return null;
+
       await LocalStorage.saveToken(token);
 
-      /// 👤 USER
-      final userJson = data['user'];
-      if (userJson == null) return null;
-
-      final user = UserModel.fromJson(userJson);
-
-      /// 🔥 LƯU + SET USER TOÀN APP
-      await LocalStorage.saveUser(user);
+      /// USER
+      final user = UserModel.fromJson(data['user']);
       currentUser.value = user;
+      await LocalStorage.saveUser(user);
 
+      debugPrint('✅ Login password thành công');
       return user;
-    } catch (e) {
-      debugPrint('login error: $e');
+    } catch (e, s) {
+      debugPrint('❌ login error: $e');
+      debugPrintStack(stackTrace: s);
       return null;
     }
   }
 
-  /// =====================================================
-  /// 🔄 INIT APP
-  /// - Gọi khi app khởi động
-  /// =====================================================
-  static Future<void> init() async {
-    final user = await LocalStorage.getUser();
-    currentUser.value = user;
-  }
-
-  /// =====================================================
-  /// 🔓 LOGOUT
-  /// =====================================================
-  static Future<void> logout() async {
-    currentUser.value = null;
-    await LocalStorage.clearAll();
-  }
-
-  /// =====================================================
-  /// 🔎 CHECK LOGIN (NHẸ – KHÔNG GỌI API)
-  /// =====================================================
-  static Future<bool> isLoggedIn() async {
+  // =====================================================
+  // 🧬 LOGIN BẰNG VÂN TAY (DÙNG TOKEN CŨ)
+  // =====================================================
+  static Future<bool> loginWithBiometric() async {
+  try {
     final token = await LocalStorage.getToken();
-    return token != null && token.isNotEmpty;
+    if (token == null || token.isEmpty) return false;
+
+    final response = await ApiClient.get(
+      '/auth/me',
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode != 200) return false;
+
+    final json = jsonDecode(response.body);
+    if (json['success'] != true) return false;
+
+    final user = UserModel.fromJson(json['data']);
+
+    /// 🔥🔥🔥 BẮT BUỘC – DÒNG QUAN TRỌNG NHẤT
+    UserSession.set(user);
+
+    await LocalStorage.saveUser(user);
+
+    debugPrint('✅ Login vân tay thành công');
+    return true;
+  } catch (e) {
+    debugPrint('❌ loginWithBiometric error: $e');
+    return false;
+  }
+}
+
+
+  // =====================================================
+  // 🔎 VERIFY TOKEN (DÙNG CHO SPLASH)
+  // =====================================================
+  static Future<bool> verifyToken() async {
+    return await loginWithBiometric();
   }
 
-  /// =====================================================
-  /// 🔁 CHANGE PASSWORD
-  /// =====================================================
+  // =====================================================
+  // 🔓 LOGOUT NHẸ (USER CHỦ ĐỘNG)
+  // ❗ GIỮ TOKEN + GIỮ BIOMETRIC
+  // =====================================================
+  static Future<void> logout() async {
+    debugPrint('🚪 Logout nhẹ – giữ vân tay');
+    currentUser.value = null;
+  }
+
+  // =====================================================
+  // 🚨 FORCE LOGOUT (TOKEN HẾT HẠN / INVALID)
+  // ❗ XOÁ SẠCH + TẮT BIOMETRIC
+  // =====================================================
+  static Future<void> forceLogout() async {
+    debugPrint('🚨 Force logout – token invalid');
+
+    currentUser.value = null;
+
+    await LocalStorage.removeToken();
+    await LocalStorage.removeUser();
+    await LocalStorage.setBiometric(false);
+  }
+
+  // =====================================================
+  // 🔁 CHANGE PASSWORD
+  // =====================================================
   static Future<bool> changePassword({
     required String oldPassword,
     required String newPassword,
@@ -146,44 +162,16 @@ class AuthService {
 
       if (response.statusCode != 200) return false;
 
-      final jsonData = jsonDecode(response.body);
-      return jsonData['success'] == true;
+      final json = jsonDecode(response.body);
+      return json['success'] == true;
     } catch (e) {
-      debugPrint('changePassword exception: $e');
+      debugPrint('❌ changePassword error: $e');
       return false;
     }
   }
 
-    /// =====================================================
-  /// 🔄 UPDATE USER SAU KHI SỬA PROFILE
-  /// - Gọi sau khi update avatar / name / info
-  /// - Reload toàn bộ UI đang listen currentUser
-  /// =====================================================
-  static Future<void> updateCurrentUser(UserModel user) async {
-    /// 🔥 set lại notifier (Home, Header, Drawer reload)
-    currentUser.value = user;
-
-    /// 🔥 lưu xuống local để Splash / mở app lại dùng
-    await LocalStorage.saveUser(user);
-  }
-
-  /// =====================================================
-  /// 👤 GET CURRENT USER (TỪ LOCAL STORAGE)
-  /// - Dùng cho reload session
-  /// - Không gọi API
-  /// =====================================================
-  static Future<UserModel?> getCurrentUser() async {
-    try {
-      final user = await LocalStorage.getUser();
-      return user;
-    } catch (e) {
-      debugPrint('getCurrentUser error: $e');
-      return null;
-    }
-  }
-
   // =====================================================
-  /// 🔁 FORGOT PASSWORD
+  // 🔁 FORGOT PASSWORD
   // =====================================================
   static Future<bool> forgotPassword({
     required String email,
@@ -196,36 +184,57 @@ class AuthService {
         },
       );
 
-      if (response.statusCode != 200) {
-        debugPrint('forgotPassword failed: ${response.statusCode}');
-        return false;
-      }
+      if (response.statusCode != 200) return false;
 
-      final jsonData = jsonDecode(response.body);
-
-      return jsonData['success'] == true;
+      final json = jsonDecode(response.body);
+      return json['success'] == true;
     } catch (e) {
-      debugPrint('forgotPassword exception: $e');
+      debugPrint('❌ forgotPassword error: $e');
       return false;
     }
   }
 
+  // =====================================================
+  // 👤 GET USER LOCAL
+  // =====================================================
+  static Future<UserModel?> getCurrentUser() async {
+    return await LocalStorage.getUser();
+  }
+
+  // =====================================================
+  // 🔎 CHECK LOGIN NHẸ (CHỈ CHECK TOKEN)
+  // =====================================================
+  static Future<bool> isLoggedIn() async {
+    final token = await LocalStorage.getToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  // =====================================================
+  // 🔁 RELOAD USER TỪ API (CÓ TOKEN)
+  // =====================================================
   static Future<bool> reloadFromApi() async {
     try {
-      final response = await ApiClient.get('/auth/me');
+      final token = await LocalStorage.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final response = await ApiClient.get(
+        '/auth/me',
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
 
       if (response.statusCode != 200) return false;
 
-      final jsonData = jsonDecode(response.body);
-      if (jsonData['success'] != true) return false;
+      final json = jsonDecode(response.body);
+      if (json['success'] != true) return false;
 
-      final user = UserModel.fromJson(jsonData['data']);
+      final user = UserModel.fromJson(json['data']);
 
-      /// 🔥 CẬP NHẬT TOÀN BỘ APP
       currentUser.value = user;
       await LocalStorage.saveUser(user);
 
-      debugPrint('✅ Reload from API: ${user.toJson()}');
+      debugPrint('✅ Reload user thành công');
       return true;
     } catch (e) {
       debugPrint('❌ reloadFromApi error: $e');
@@ -233,5 +242,11 @@ class AuthService {
     }
   }
 
-
+  // =====================================================
+  // 🔁 UPDATE USER LOCAL
+  // =====================================================
+  static Future<void> updateCurrentUser(UserModel user) async {
+    currentUser.value = user;
+    await LocalStorage.saveUser(user);
+  }
 }

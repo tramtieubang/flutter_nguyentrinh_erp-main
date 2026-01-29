@@ -4,145 +4,92 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../models/profile_model.dart';
 
-/// =====================================================
-/// LOCAL STORAGE
-/// Lưu dữ liệu đăng nhập & cấu hình cục bộ trên thiết bị
-/// =====================================================
 class LocalStorage {
-  /// Private constructor
   LocalStorage._();
 
-  // =====================================================
-  // KEY LƯU TRỮ
-  // =====================================================
-  static const _tokenKey   = 'auth_token';           // JWT token
-  static const _userKey    = 'auth_user';            // UserModel
-  static const _profileKey = 'profile';              // ProfileModel
-  static const _bioKey     = 'biometric_enabled';    // Bật vân tay
+  static const _tokenKey = 'auth_token';
+  static const _userKey = 'auth_user';
+  static const _profileKey = 'profile';
+  static const _bioKey = 'biometric_enabled';
 
-  // =====================================================
-  // 🔐 TOKEN
-  // =====================================================
-
-  /// Lưu JWT token
+  /// ================= TOKEN =================
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token.trim());
   }
 
-  /// Lấy JWT token
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-
     if (token == null || token.trim().isEmpty) return null;
     return token;
   }
 
-  /// Xoá token + TẮT biometric
   static Future<void> removeToken() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
-
-    /// ❗ Token mất → không cho login vân tay
-    await prefs.setBool(_bioKey, false);
   }
 
-  // =====================================================
-  // 👤 USER
-  // =====================================================
-
-  /// Lưu thông tin user
+  /// ================= USER =================
   static Future<void> saveUser(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _userKey,
-      jsonEncode(user.toJson()),
-    );
+    await prefs.setString(_userKey, jsonEncode(user.toJson()));
   }
 
-  /// Lấy thông tin user
   static Future<UserModel?> getUser() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString(_userKey);
-
     if (data == null || data.trim().isEmpty) return null;
     return UserModel.fromJson(jsonDecode(data));
   }
 
-  /// Xoá user
   static Future<void> removeUser() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userKey);
   }
 
-  // =====================================================
-  // 🧑 PROFILE
-  // =====================================================
-
+  /// ================= PROFILE =================
   static Future<void> saveProfile(ProfileModel profile) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _profileKey,
-      jsonEncode(profile.toJson()),
-    );
+    await prefs.setString(_profileKey, jsonEncode(profile.toJson()));
   }
 
   static Future<ProfileModel?> getProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final data = prefs.getString(_profileKey);
-
     if (data == null || data.trim().isEmpty) return null;
     return ProfileModel.fromJson(jsonDecode(data));
   }
 
-  // =====================================================
-  // 🔑 BIOMETRIC
-  // =====================================================
-
-  /// Bật / tắt đăng nhập bằng sinh trắc học
+  /// ================= BIOMETRIC =================
   static Future<void> setBiometric(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_bioKey, value);
   }
 
-  /// Kiểm tra có bật biometric không
   static Future<bool> isBiometricEnabled() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_bioKey) ?? false;
   }
 
-  // =====================================================
-  // 🔄 AUTO LOGIN (VÂN TAY)
-  // =====================================================
-
-  /// Có đủ điều kiện auto login bằng vân tay không?
+  /// ================= AUTO LOGIN CHECK =================
+  /// Có đủ dữ liệu để auto login bằng vân tay không?
   static Future<bool> canAutoLogin() async {
     final token = await getToken();
-    if (token == null || token.isEmpty) return false;
-
     final enabled = await isBiometricEnabled();
-    if (!enabled) return false;
-
-    return true;
+    return token != null && enabled;
   }
 
-  // =====================================================
-  // 🚪 LOGOUT
-  // =====================================================
-
-  /// Logout chuẩn: xoá token + user + profile + TẮT biometric
+  /// ================= LOGOUT (GIỮ VÂN TAY) =================
   static Future<void> clearLoginOnly() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
     await prefs.remove(_profileKey);
-
-    /// ❗ Logout là phải tắt vân tay
-    await prefs.setBool(_bioKey, false);
+    // ❗ KHÔNG xoá biometric
   }
 
-  /// Reset toàn bộ app
+  /// ================= RESET APP =================
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

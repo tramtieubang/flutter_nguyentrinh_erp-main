@@ -24,6 +24,10 @@ dependencies:
   intl: ^0.20.2
   cupertino_icons: ^1.0.8
 
+  local_auth: ^2.2.0
+  flutter_secure_storage: ^9.0.0
+  app_settings: ^5.1.1
+
   # Firebase (VERSION HỢP LỆ)
   firebase_core: ^2.30.0
   firebase_database: ^10.5.0

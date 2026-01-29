@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'app.dart';
+import 'core/app_keys.dart';
 import 'core/services/auth_service.dart';
 import 'core/session/user_session.dart';
 import 'core/services/work_assignment_service.dart';
@@ -10,20 +11,15 @@ import 'core/models/work_assignment_model.dart';
 import 'features/work/work_detail_screen.dart';
 import 'features/auth/login_screen.dart';
 
-/// 🔹 Navigator global (dùng cho notification)
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 /// =======================================================
-/// 🔹 FCM background handler (KHÔNG UI)
+/// 🔹 FCM BACKGROUND HANDLER (KHÔNG UI)
 /// =======================================================
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 }
 
 /// =======================================================
-/// 🔹 Xử lý khi click notification
-/// - Nếu CHƯA login → mở Login
-/// - Nếu ĐÃ login → mở chi tiết công việc
+/// 🔹 XỬ LÝ CLICK NOTIFICATION
 /// =======================================================
 void _handleNotification(RemoteMessage message) {
   final navigator = navigatorKey.currentState;
@@ -34,10 +30,10 @@ void _handleNotification(RemoteMessage message) {
   if (workId == null) return;
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    /// 🔥 LẤY USER HIỆN TẠI
+    /// 🔹 LẤY USER TỪ LOCAL (KHÔNG VERIFY TOKEN Ở ĐÂY)
     final user = await AuthService.getCurrentUser();
 
-    /// ❌ CHƯA LOGIN → ĐẨY VỀ LOGIN
+    /// ❌ CHƯA LOGIN → LOGIN
     if (user == null) {
       navigator.push(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -45,17 +41,15 @@ void _handleNotification(RemoteMessage message) {
       return;
     }
 
-    /// ✅ ĐÃ LOGIN → SET SESSION (CỰC KỲ QUAN TRỌNG)
+    /// ✅ SET SESSION (BẮT BUỘC CHO API)
     UserSession.set(user);
 
     try {
-      /// 🔹 Gọi API lấy chi tiết công việc
       final WorkAssignmentModel work =
           await WorkAssignmentService.getWorkDetail(workId);
 
       if (!navigator.mounted) return;
 
-      /// 🔹 Push màn hình chi tiết
       navigator.push(
         MaterialPageRoute(
           builder: (_) => WorkDetailScreen(
@@ -67,7 +61,7 @@ void _handleNotification(RemoteMessage message) {
         ),
       );
     } catch (e, s) {
-      debugPrint('❌ Lỗi lấy chi tiết công việc: $e');
+      debugPrint('❌ Notification error: $e');
       debugPrintStack(stackTrace: s);
     }
   });
@@ -80,23 +74,17 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  /// 🔥 LOAD USER ĐÃ LOGIN (FIX LỖI HOME TRẮNG)
-  final user = await AuthService.getCurrentUser();
-  if (user != null) {
-    UserSession.set(user);
-  }
-
-  /// 🔹 FCM background
+  /// 🔹 FCM BACKGROUND
   FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
-  /// 🔹 Xin quyền notification
+  /// 🔹 XIN QUYỀN NOTIFICATION
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  /// 🔹 App đang mở
+  /// 🔹 APP ĐANG MỞ
   FirebaseMessaging.onMessage.listen(_handleNotification);
 
   runApp(const MyAppWrapper());
@@ -104,9 +92,6 @@ Future<void> main() async {
 
 /// =======================================================
 /// 🔹 APP WRAPPER
-/// - Bắt notification khi app:
-///   + bị kill
-///   + chạy background
 /// =======================================================
 class MyAppWrapper extends StatefulWidget {
   const MyAppWrapper({super.key});
@@ -121,23 +106,17 @@ class _MyAppWrapperState extends State<MyAppWrapper> {
   @override
   void initState() {
     super.initState();
-    _initApp();
+    _initNotification();
   }
 
-  Future<void> _initApp() async {
-    /// 🔥 LOAD USER TRƯỚC
-    final user = await AuthService.getCurrentUser();
-    if (user != null) {
-      UserSession.set(user);
-    }
-
-    /// 🔹 App mở từ notification khi bị kill
+  Future<void> _initNotification() async {
+    /// 🔹 APP MỞ TỪ NOTIFICATION (KHI BỊ KILL)
     final message = await FirebaseMessaging.instance.getInitialMessage();
     if (message != null) {
       _handleNotification(message);
     }
 
-    /// 🔹 App background → click notification
+    /// 🔹 APP BACKGROUND → CLICK NOTIFICATION
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotification);
 
     setState(() => _loading = false);
@@ -157,8 +136,9 @@ class _MyAppWrapperState extends State<MyAppWrapper> {
 
     return MaterialApp(
       navigatorKey: navigatorKey,
+      scaffoldMessengerKey: messengerKey,
       debugShowCheckedModeBanner: false,
-      home: const MyApp(),
+      home: const MyApp(), // 👉 MyApp chứa SplashScreen
     );
   }
 }

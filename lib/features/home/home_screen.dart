@@ -4,7 +4,6 @@ import '../../core/session/user_session.dart';
 import '../../core/models/user_model.dart';
 import '../../core/models/work_status_model.dart';
 import '../../core/services/work_assignment_service.dart';
-//import '../../config/api_config.dart';
 
 import 'widgets/home_header.dart';
 import 'widgets/statistic_card.dart';
@@ -12,9 +11,6 @@ import 'widgets/feature_grid.dart';
 
 /// =======================================================
 /// 🏠 HOME SCREEN
-/// - Tự động cập nhật tên + avatar khi update profile
-/// - Statistic load 1 lần / user
-/// - Giữ state khi đổi tab
 /// =======================================================
 class HomeScreen extends StatefulWidget {
   final void Function({
@@ -34,21 +30,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with AutomaticKeepAliveClientMixin {
-  /// ===============================
-  /// STATE
-  /// ===============================
   bool _loadingStatistic = false;
   List<WorkStatus> _statuses = [];
 
-  /// lưu userId đã load statistic
   int? _loadedUserId;
 
   @override
   bool get wantKeepAlive => true;
 
-  /// ===============================
-  /// LOAD STATISTIC
-  /// ===============================
+  // ===================================================
+  // LOAD STATISTIC
+  // ===================================================
   Future<void> _loadStatistic() async {
     if (_loadingStatistic) return;
 
@@ -62,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen>
         _statuses = data;
         _loadingStatistic = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _statuses = [];
@@ -71,9 +63,9 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  /// ===============================
-  /// BUILD
-  /// ===============================
+  // ===================================================
+  // BUILD
+  // ===================================================
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -95,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen>
           child: ValueListenableBuilder<UserModel?>(
             valueListenable: UserSession.currentUser,
             builder: (context, user, _) {
-              /// ⛔ CHƯA LOGIN
+              /// ⛔ CHƯA CÓ USER → ĐỢI
               if (user == null) {
                 return const Center(
                   child: CircularProgressIndicator(color: Colors.orange),
@@ -110,35 +102,22 @@ class _HomeScreenState extends State<HomeScreen>
                 });
               }
 
-              /// ================= USER INFO =================
+              // ================= USER INFO =================
 
-              /// ✅ NAME (ưu tiên profile.name, fallback username)
-              final String? profileName = user.profile?.name;
-
+              /// ✅ NAME
               final String name =
-                  profileName != null && profileName.isNotEmpty
-                      ? profileName
+                  user.profile != null && user.profile!.name.isNotEmpty
+                      ? user.profile!.name
                       : user.username;
 
-              final String? profilePhone = user.profile?.phone;
-
+              /// ✅ PHONE
               final String phone =
-                  profilePhone != null && profilePhone.isNotEmpty
-                      ? profilePhone
+                  user.profile != null && user.profile!.phone.isNotEmpty
+                      ? user.profile!.phone
                       : 'Chưa cập nhật';
 
-              /// ✅ SUBTITLE
-              // final String subtitle = user.email ?? 'Hệ thống quản lý nội bộ';
-              final String subtitle = phone;
-
-              /// ✅ AVATAR (chuẩn hóa URL + bust cache)                         
+              /// ✅ AVATAR
               final String avatar = user.profile?.avatar ?? '';
-              
-
-             /*  if (rawAvatar != null && rawAvatar.isNotEmpty) {
-                /// backend đã trả URL đầy đủ (UrlHelper::avatar)
-                avatar = '$rawAvatar?uid=${user.id}';
-              } */
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
@@ -148,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen>
                     /// ================= HEADER =================
                     HomeHeader(
                       name: name,
-                      subtitle: subtitle,
+                      subtitle: phone,
                       avatar: avatar,
                     ),
 

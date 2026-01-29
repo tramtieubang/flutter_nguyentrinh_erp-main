@@ -36,10 +36,15 @@ class UserSession {
       debugPrint('🔁 Reload user: ${user?.toJson()}');
 
       if (user != null) {
-        currentUser.value = user; // 🔥 bắt buộc gán object MỚI
+        currentUser.value = user; // ✅ gán object mới
       }
     } catch (e) {
       debugPrint('❌ UserSession.reload error: $e');
+
+      /// 🔥 TRIGGER UI nhưng KHÔNG GỌI notifyListeners
+      if (currentUser.value != null) {
+        currentUser.value = currentUser.value;
+      }
     }
   }
 

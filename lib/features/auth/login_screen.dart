@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:app_settings/app_settings.dart';
 
 import '../../core/services/auth_service.dart';
+import '../../core/services/biometric_service.dart';
 import '../../core/storage/local_storage.dart';
 import '../../core/session/user_session.dart';
+
 import '../main/main_screen.dart';
 
 import 'widgets/login_background.dart';
@@ -18,30 +21,47 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
+  // =====================================================
+  // FORM
+  // =====================================================
   final _formKey = GlobalKey<FormState>();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
 
   bool _loading = false;
 
-  late AnimationController _mainCtrl;
-  late AnimationController _shakeCtrl;
+  // =====================================================
+  // ANIMATION
+  // =====================================================
+  late final AnimationController _mainCtrl;
+  late final AnimationController _shakeCtrl;
 
+  // =====================================================
+  // SERVICE
+  // =====================================================
+  final BiometricService _biometricService = BiometricService();
+
+  // =====================================================
+  // INIT
+  // =====================================================
   @override
   void initState() {
     super.initState();
+
     _mainCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    );
+    )..forward();
+
     _shakeCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _mainCtrl.forward();
   }
 
-  /// ================= LOGIN =================
+  // =====================================================
+  // 🔑 LOGIN USERNAME / PASSWORD (KHÔNG BẬT BIOMETRIC)
+  // =====================================================
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
@@ -52,41 +72,124 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _loading = true);
 
-    /// 🔐 CALL API LOGIN
     final user = await AuthService.login(
       _userCtrl.text.trim(),
       _passCtrl.text,
     );
 
-    if (!mounted) return; // ✅ BẮT BUỘC
-
+    if (!mounted) return;
     setState(() => _loading = false);
 
-    /// ❌ LOGIN FAIL
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sai tên đăng nhập hoặc mật khẩu'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Sai tên đăng nhập hoặc mật khẩu');
       return;
     }
 
-    /// ✅ GÁN SESSION TOÀN APP
-    UserSession.currentUser.value = user;
+    /// ✅ SET SESSION
+    UserSession.set(user);
 
-    /// ✅ LƯU USER LOCAL (SPLASH + AUTO LOGIN)
+    /// ✅ LƯU USER + TOKEN (AuthService đã lưu token)
     await LocalStorage.saveUser(user);
 
-    if (!mounted) return; // ✅ PHÒNG TRƯỜNG HỢP HIẾM
+    /// ❌ TUYỆT ĐỐI KHÔNG bật biometric ở đây
 
-    /// 🚀 ĐI VÀO MAIN
-    Navigator.of(context).pushReplacement(
+    _goMain();
+  }
+
+  // =====================================================
+  // 🔐 USER BẤM ICON VÂN TAY (CHỦ ĐỘNG)
+  // =====================================================
+  Future<void> _loginWithBiometric() async {
+    final canCheck = await _biometricService.canCheckBiometric();
+    if (!mounted) return;
+
+    if (!canCheck) {
+      _showBiometricSettingDialog();
+      return;
+    }
+
+    final result = await _biometricService.authenticate();
+    if (!mounted) return;
+
+    /// ❌ Chưa đăng ký vân tay / FaceID
+    if (result == BiometricResult.notAvailable) {
+      _showBiometricSettingDialog();
+      return;
+    }
+
+    /// ❌ Huỷ / fail
+    if (result != BiometricResult.success) return;
+
+    /// ✅ LẦN ĐẦU USER ĐỒNG Ý → BẬT BIOMETRIC
+    await LocalStorage.setBiometric(true);
+
+    setState(() => _loading = true);
+
+    final success = await AuthService.loginWithBiometric();
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!success) {
+      _showError('Phiên đăng nhập đã hết hạn');
+      await AuthService.logout();
+      return;
+    }
+
+    _goMain();
+  }
+
+  // =====================================================
+  // ⚠️ DIALOG HƯỚNG DẪN BẬT SINH TRẮC
+  // =====================================================
+  void _showBiometricSettingDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Chưa bật sinh trắc học'),
+        content: const Text(
+          'Thiết bị chưa được thiết lập vân tay hoặc Face ID.\n\n'
+          'Vui lòng vào Cài đặt để bật.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Để sau'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              AppSettings.openAppSettings();
+            },
+            child: const Text('Mở cài đặt'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =====================================================
+  // HELPER
+  // =====================================================
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _goMain() {
+    Navigator.pushReplacement(
+      context,
       MaterialPageRoute(builder: (_) => const MainScreen()),
     );
   }
 
+  // =====================================================
+  // DISPOSE
+  // =====================================================
   @override
   void dispose() {
     _mainCtrl.dispose();
@@ -96,6 +199,9 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
+  // =====================================================
+  // UI
+  // =====================================================
   @override
   Widget build(BuildContext context) {
     return LoginBackground(
@@ -109,6 +215,7 @@ class _LoginScreenState extends State<LoginScreen>
             shakeCtrl: _shakeCtrl,
             loading: _loading,
             onLogin: _login,
+            onBiometricLogin: _loginWithBiometric,
           ),
         ],
       ),
