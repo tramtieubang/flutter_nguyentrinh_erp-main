@@ -8,6 +8,8 @@ import 'core/services/auth_service.dart';
 import 'core/session/user_session.dart';
 import 'core/services/work_assignment_service.dart';
 import 'core/models/work_assignment_model.dart';
+import 'core/network/api_client.dart';
+import 'core/storage/local_storage.dart';
 import 'features/work/work_detail_screen.dart';
 import 'features/auth/login_screen.dart';
 
@@ -30,21 +32,23 @@ void _handleNotification(RemoteMessage message) {
   if (workId == null) return;
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    /// 🔹 LẤY USER TỪ LOCAL (KHÔNG VERIFY TOKEN Ở ĐÂY)
-    final user = await AuthService.getCurrentUser();
-
-    /// ❌ CHƯA LOGIN → LOGIN
-    if (user == null) {
-      navigator.push(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-      return;
-    }
-
-    /// ✅ SET SESSION (BẮT BUỘC CHO API)
-    UserSession.set(user);
-
     try {
+      /// 🔹 LẤY TOKEN + USER LOCAL
+      final token = await LocalStorage.getToken();
+      final user = await LocalStorage.getUser();
+
+      /// ❌ CHƯA LOGIN
+      if (token == null || token.isEmpty || user == null) {
+        navigator.push(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+        return;
+      }
+
+      /// 🔥🔥🔥 BẮT BUỘC RESTORE SESSION
+      ApiClient.setToken(token);
+      UserSession.set(user);
+
       final WorkAssignmentModel work =
           await WorkAssignmentService.getWorkDetail(workId);
 
@@ -87,6 +91,21 @@ Future<void> main() async {
   /// 🔹 APP ĐANG MỞ
   FirebaseMessaging.onMessage.listen(_handleNotification);
 
+  // =====================================================
+  // 🔥 RESTORE TOKEN + SESSION NGAY KHI APP START
+  // =====================================================
+  final token = await LocalStorage.getToken();
+  final user = await LocalStorage.getUser();
+
+  if (token != null && token.isNotEmpty && user != null) {
+    ApiClient.setToken(token);
+    UserSession.set(user);
+    debugPrint('🔐 Token & session restored on app start');
+  }
+
+  /// 🔹 INIT AUTH (KHÔNG GỌI API)
+  await AuthService.init();
+
   runApp(const MyAppWrapper());
 }
 
@@ -126,6 +145,7 @@ class _MyAppWrapperState extends State<MyAppWrapper> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const MaterialApp(
+        debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: CircularProgressIndicator(color: Colors.orange),

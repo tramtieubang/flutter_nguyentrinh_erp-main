@@ -21,29 +21,21 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with TickerProviderStateMixin {
-  // =====================================================
-  // FORM
-  // =====================================================
+  // ================= FORM =================
   final _formKey = GlobalKey<FormState>();
   final _userCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
 
   bool _loading = false;
 
-  // =====================================================
-  // ANIMATION
-  // =====================================================
+  // ================= ANIMATION =================
   late final AnimationController _mainCtrl;
   late final AnimationController _shakeCtrl;
 
-  // =====================================================
-  // SERVICE
-  // =====================================================
+  // ================= SERVICE =================
   final BiometricService _biometricService = BiometricService();
 
-  // =====================================================
-  // INIT
-  // =====================================================
+  // ================= INIT =================
   @override
   void initState() {
     super.initState();
@@ -60,7 +52,8 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // =====================================================
-  // 🔑 LOGIN USERNAME / PASSWORD (KHÔNG BẬT BIOMETRIC)
+  // 🔑 LOGIN USERNAME / PASSWORD
+  // ❌ KHÔNG bật biometric ở đây
   // =====================================================
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
@@ -88,16 +81,16 @@ class _LoginScreenState extends State<LoginScreen>
     /// ✅ SET SESSION
     UserSession.set(user);
 
-    /// ✅ LƯU USER + TOKEN (AuthService đã lưu token)
+    /// ✅ LƯU USER (token đã được AuthService lưu)
     await LocalStorage.saveUser(user);
 
-    /// ❌ TUYỆT ĐỐI KHÔNG bật biometric ở đây
+    /// ❌ TUYỆT ĐỐI KHÔNG setBiometric ở đây
 
     _goMain();
   }
 
   // =====================================================
-  // 🔐 USER BẤM ICON VÂN TAY (CHỦ ĐỘNG)
+  // 🔐 USER CHỦ ĐỘNG BẤM ICON VÂN TAY
   // =====================================================
   Future<void> _loginWithBiometric() async {
     final canCheck = await _biometricService.canCheckBiometric();
@@ -108,23 +101,20 @@ class _LoginScreenState extends State<LoginScreen>
       return;
     }
 
+    /// 👉 HỎI VÂN TAY (CHỈ Ở ĐÂY)
     final result = await _biometricService.authenticate();
     if (!mounted) return;
 
-    /// ❌ Chưa đăng ký vân tay / FaceID
     if (result == BiometricResult.notAvailable) {
       _showBiometricSettingDialog();
       return;
     }
 
-    /// ❌ Huỷ / fail
     if (result != BiometricResult.success) return;
-
-    /// ✅ LẦN ĐẦU USER ĐỒNG Ý → BẬT BIOMETRIC
-    await LocalStorage.setBiometric(true);
 
     setState(() => _loading = true);
 
+    /// 👉 LOGIN BẰNG TOKEN
     final success = await AuthService.loginWithBiometric();
 
     if (!mounted) return;
@@ -135,6 +125,14 @@ class _LoginScreenState extends State<LoginScreen>
       await AuthService.logout();
       return;
     }
+
+    /// ✅ CHỈ SAU KHI:
+    /// - VÂN TAY OK
+    /// - TOKEN OK
+    /// → MỚI BẬT BIOMETRIC
+    await LocalStorage.setBiometric(true);
+
+    debugPrint('✅ Đã bật biometric');
 
     _goMain();
   }
@@ -168,9 +166,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // =====================================================
-  // HELPER
-  // =====================================================
+  // ================= HELPER =================
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -187,9 +183,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // =====================================================
-  // DISPOSE
-  // =====================================================
+  // ================= DISPOSE =================
   @override
   void dispose() {
     _mainCtrl.dispose();
@@ -199,9 +193,7 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // =====================================================
-  // UI
-  // =====================================================
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return LoginBackground(

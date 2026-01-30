@@ -7,15 +7,35 @@ import '../storage/local_storage.dart';
 class ApiClient {
   ApiClient._(); // ❌ không cho new
 
-  /// =================================================
-  /// 🔐 HEADER CHUNG CHO TẤT CẢ REQUEST
-  /// - Tự động gắn Bearer Token (nếu có)
-  /// - Cho phép override / bổ sung header
-  /// =================================================
+  // =================================================
+  // 🔐 TOKEN IN-MEMORY (QUAN TRỌNG)
+  // =================================================
+  static String? _token;
+
+  /// 🔥🔥🔥 GỌI KHI:
+  /// - App start (main)
+  /// - Login / biometric login
+  static void setToken(String token) {
+    _token = token;
+  }
+
+  /// 🔥 GỌI KHI FORCE LOGOUT
+  static void clearToken() {
+    _token = null;
+  }
+
+  // =================================================
+  // 🔐 HEADER CHUNG CHO TẤT CẢ REQUEST
+  // - Ưu tiên token in-memory
+  // - Fallback LocalStorage (tương thích code cũ)
+  // =================================================
   static Future<Map<String, String>> _headers({
     Map<String, String>? extra,
   }) async {
-    final token = await LocalStorage.getToken();
+    String? token = _token;
+
+    /// Fallback (lần đầu app mở)
+    token ??= await LocalStorage.getToken();
 
     return {
       'Accept': 'application/json',
@@ -26,9 +46,9 @@ class ApiClient {
     };
   }
 
-  /// =================================================
-  /// 🔹 BUILD URI (hỗ trợ query parameters)
-  /// =================================================
+  // =================================================
+  // 🔹 BUILD URI (hỗ trợ query parameters)
+  // =================================================
   static Uri _buildUri(
     String endpoint, {
     Map<String, String>? query,
@@ -40,9 +60,9 @@ class ApiClient {
     return base.replace(queryParameters: query);
   }
 
-  /// =================================================
-  /// 📌 GET REQUEST
-  /// =================================================
+  // =================================================
+  // 📌 GET REQUEST
+  // =================================================
   static Future<http.Response> get(
     String endpoint, {
     Map<String, String>? query,
@@ -56,9 +76,9 @@ class ApiClient {
     );
   }
 
-  /// =================================================
-  /// 📌 POST REQUEST
-  /// =================================================
+  // =================================================
+  // 📌 POST REQUEST
+  // =================================================
   static Future<http.Response> post(
     String endpoint, {
     Map<String, String>? query,
@@ -74,9 +94,9 @@ class ApiClient {
     );
   }
 
-  /// =================================================
-  /// 📌 PUT REQUEST
-  /// =================================================
+  // =================================================
+  // 📌 PUT REQUEST
+  // =================================================
   static Future<http.Response> put(
     String endpoint, {
     Map<String, String>? query,
@@ -92,9 +112,9 @@ class ApiClient {
     );
   }
 
-  /// =================================================
-  /// 📌 DELETE REQUEST
-  /// =================================================
+  // =================================================
+  // 📌 DELETE REQUEST
+  // =================================================
   static Future<http.Response> delete(
     String endpoint, {
     Map<String, String>? query,
